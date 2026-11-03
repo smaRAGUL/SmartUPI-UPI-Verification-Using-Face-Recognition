@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 0 auto; text-align: center;">
+    <div class="card">
+        <div style="font-size: 4rem; margin-bottom: 1.5rem;">🏦</div>
+        <h2 style="margin-bottom: 1rem;">Activate Your Wallet</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">
+            To activate your biometric transaction engine, you must maintain a minimum balance of <b>₹50,000</b>.
+        </p>
+
+        {% if error %}
+        <div style="color: var(--error); margin-bottom: 1.5rem; font-weight: 600;">{{ error }}</div>
+        {% endif %}
+
+        <form action="/activate" method="POST">
+            <div class="input-group">
+                <label>Deposit Amount (INR)</label>
+                <input type="number" name="amount" required placeholder="50000" min="50000">
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 1rem;">
+                Activate & Go to Dashboard
+            </button>
+        </form>
+
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 1.5rem;">
+            This deposit links your bank account securely via NPCI guidelines.
+        </p>
+    </div>
+</div>
+{% endblock %}

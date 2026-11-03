@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card" style="max-width: 500px; margin: 2rem auto; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(30, 41, 59, 0.9);">
+    <h2 style="color: var(--error); text-align: center; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <span style="font-size: 1.5em;">⚠️</span> Admin Risk Zone
+    </h2>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">
+        This section requires authorized admin access and performs irrecoverable backend infrastructure commands.
+    </p>
+
+    <div style="background: rgba(239, 68, 68, 0.1); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid var(--error);">
+        <h4 style="color: var(--error); margin-bottom: 0.5rem;">Warning: Permanent Operation</h4>
+        <p style="font-size: 0.95rem; color: #f8fafc; line-height: 1.6;">
+            This action will permanently delete all data in the system. The table structures and schema will remain intact for reuse, but all user accounts, transactions, and temporary states will be wiped globally.
+        </p>
+    </div>
+
+    <form id="reset-form">
+        <div class="input-group">
+            <label style="color: var(--error); font-weight: bold;">Admin Password</label>
+            <input type="password" id="admin_pwd" required placeholder="Enter administrative token" autocomplete="new-password">
+        </div>
+        
+        <div class="input-group">
+            <label style="color: var(--error); font-weight: bold;">Confirm Operation Action</label>
+            <input type="text" id="confirm_text" required placeholder="Type DELETE to proceed" autocomplete="off" style="text-transform: uppercase;">
+        </div>
+
+        <button type="submit" class="btn" id="delete-btn" style="width: 100%; background: var(--error); padding: 1.2rem; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">
+            Clear All Data
+        </button>
+    </form>
+</div>
+
+<script>
+    document.getElementById('reset-form').onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const pwd = document.getElementById('admin_pwd').value;
+        const confirm_txt = document.getElementById('confirm_text').value.trim();
+        const btn = document.getElementById('delete-btn');
+
+        if (confirm_txt !== "DELETE") {
+            showToast("You must literally type DELETE to prove confirmation", "error");
+            return;
+        }
+
+        btn.innerHTML = '<span class="spinner"></span> Executing Wipe...';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('password', pwd);
+        formData.append('confirm', confirm_txt);
+
+        try {
+            const res = await fetch('/api/admin/reset_db', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                showToast(data.message);
+                document.getElementById('reset-form').reset();
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast("A server network error blocked the wipe command.", "error");
+        } finally {
+            btn.innerHTML = 'Clear All Data';
+            btn.disabled = false;
+        }
+    };
+</script>
+{% endblock %}

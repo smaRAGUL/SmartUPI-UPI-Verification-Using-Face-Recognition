@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+    <!-- LEFT: Profile & Transfer -->
+    <div>
+        <div class="card" style="margin-bottom: 2rem; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: -20px; right: -20px; font-size: 8rem; opacity: 0.1;">💳</div>
+            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Current Balance</h3>
+            <h1 style="font-size: 3rem; margin-bottom: 1rem;">₹{{ "{:,.2f}".format(user.balance) }}</h1>
+            <p style="font-weight: 600; color: var(--accent);">{{ user.upi_id }}</p>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 1.5rem;">Send Money</h3>
+            <form id="transfer-form">
+                <div class="input-group">
+                    <label>Recipient UPI ID</label>
+                    <input type="text" id="recipient_upi" required placeholder="name@bank">
+                </div>
+                <div class="input-group">
+                    <label>Amount (INR)</label>
+                    <input type="number" id="amount" required max="9999999999"
+                        oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);" placeholder="0.00">
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Identity scan will be required to authorize the transaction.
+                </p>
+
+                <button type="button" class="btn" style="width: 100%;" onclick="openTransferModal()">
+                    Proceed to Pay
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RIGHT: History -->
+    <div>
+        <div class="card">
+            <h3 style="margin-bottom: 1.5rem;">Recent Payments</h3>
+            {% if not transactions %}
+            <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No recent transactions.</p>
+            {% else %}
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                {% for tx in transactions %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <div>
+                        <p style="font-weight: 600;">
+                            {% if tx.sender_id == user.id %}
+                                To: {{ tx.recipient_upi }}
+                            {% else %}
+                                Received
+                            {% endif %}
+                        </p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">{{ tx.timestamp.strftime('%d %b, %H:%M') }}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        {% if tx.sender_id == user.id %}
+                            <p style="font-weight: 700; color: var(--error);">-₹{{ "{:,.2f}".format(tx.amount) }}</p>
+                        {% else %}
+                            <p style="font-weight: 700; color: var(--accent);">+₹{{ "{:,.2f}".format(tx.amount) }}</p>
+                        {% endif %}
+                        <p style="font-size: 0.7rem; color: var(--accent);">{{ tx.status }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Premium Success UI Styles */
+    .success-icon-wrapper {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+        border: 2px solid rgba(16, 185, 129, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.1);
+        animation: pulseSuccess 2s infinite;
+    }
+
+    @keyframes pulseSuccess {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .premium-scratch-card {
+        margin: 0 auto 2.5rem;
+        width: 100%;
+        max-width: 340px;
+        background: linear-gradient(135deg, #1e1b4b, #312e81, #4338ca);
+        border-radius: 20px;
+        padding: 2rem 1.5rem;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    .premium-scratch-card:hover {
+        transform: translateY(-5px) scale(1.02);
+    }
+
+    .premium-scratch-cover {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6, #d946ef);
+        background-size: 200% 200%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s;
+        z-index: 2;
+        border-radius: 20px;
+        animation: gradientShift 5s ease infinite;
+    }
+
+    .premium-scratch-cover::before {
+        content: '';
+        position: absolute;
+        inset: -50%;
+        background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px);
+        transform: rotate(-15deg);
+        pointer-events: none;
+    }
+
+    .scratch-shimmer {
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+        transform: skewX(-20deg);
+        animation: shimmerFast 2s infinite;
+    }
+
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    @keyframes shimmerFast {
+        100% { left: 200%; }
+    }
+
+    .premium-reward-content h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #e2e8f0;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-weight: 600;
+    }
+
+    .premium-reward-content h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin: 0;
+        background: linear-gradient(to right, #ffd700, #ffaa00);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+</style>
+
+<!-- Bio-Auth Modal -->
+<div id="bio-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 1000; justify-content: center; align-items: center; padding: 1rem;">
+    <div class="card"
+        style="max-width: 450px; width: 100%; text-align: center; border: 1px solid rgba(255,255,255,0.15);">
+
+        <!-- STEP 1: FACE SCAN -->
+        <div id="step-face">
+            <h2 style="margin-bottom: 0.5rem; color: var(--text);">Step 1: Identity Check</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Look into the camera to verify your identity</p>
+
+            <div id="camera-container"
+                style="border-radius: 50%; width: 220px; height: 220px; aspect-ratio: 1/1; margin: 0 auto 1.5rem; border: 4px solid var(--primary); box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);">
+                <video id="video-bio" autoplay muted style="transform: scaleX(-1);"></video>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button class="btn" style="flex: 1; background: rgba(255,255,255,0.05);"
+                    onclick="closeModal()">Cancel</button>
+                <button id="verify-face-btn" class="btn" style="flex: 2; background: var(--primary);"
+                    onclick="verifyFaceOnly()">Scan & Verify</button>
+            </div>
+        </div>
+
+        <!-- STEP 2: PIN ENTRY (Hidden initially) -->
+        <div id="step-pin" style="display: none;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; color: var(--accent);">🔢</div>
+            <h2 style="margin-bottom: 0.5rem;">PIN Verification</h2>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Enter your 6-digit UPI PIN to securely authorize
+                this transfer.</p>
+
+            <div class="input-group" style="text-align: left;">
+                <label style="text-align: center; display: block;">Enter UPI PIN</label>
+                <input type="password" id="confirm_pin" maxlength="6" required placeholder="••••••"
+                    style="text-align: center; letter-spacing: 0.8rem; font-size: 1.5rem; background: rgba(0,0,0,0.3); border-color: var(--accent);">
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button class="btn" style="flex: 1; background: rgba(255,255,255,0.05);"
+                    onclick="closeModal()">Cancel</button>
+                <button id="pay-btn" class="btn" style="flex: 2; background: var(--accent);"
+                    onclick="completeTransaction()">Pay Now</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: SUCCESS (Hidden initially) -->
+        <div id="step-success" style="display: none; padding: 1rem 0;">
+            <div class="success-icon-wrapper">
+                <div style="font-size: 3.5rem; color: var(--accent); line-height: 1;">✓</div>
+            </div>
+            <h2 style="margin-bottom: 0.5rem; color: var(--accent); font-size: 2.2rem; font-weight: 700;">Success!</h2>
+            <p id="success-message" style="color: var(--text-muted); margin-bottom: 2.5rem; font-size: 1.1rem;">
+                Transaction completed successfully.</p>
+                
+            <!-- SCRATCH CARD -->
+            <div id="scratch-card" class="premium-scratch-card" onclick="revealScratchCard()">
+                <div id="scratch-cover" class="premium-scratch-cover">
+                    <div class="scratch-shimmer"></div>
+                    <span style="color:#ffffff; font-weight: 700; font-size: 1.3rem; letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1;">TAP TO REVEAL ✨</span>
+                </div>
+                <div class="premium-reward-content" style="text-align: center;">
+                    <h3>You Won Cashback!</h3>
+                    <h1 id="reward-amount">₹0</h1>
+                    <div style="margin-top: 1rem; font-size: 0.8rem; color: rgba(255,255,255,0.5);">Directly deposited to your bank</div>
+                </div>
+            </div>
+
+            <button class="btn" style="width: 100%; background: linear-gradient(to right, var(--accent), #059669); font-size: 1.1rem; padding: 1rem; border-radius: 16px; box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);"
+                onclick="window.location.reload()">Done</button>
+        </div>
+    </div>
+</div>
+
+<canvas id="canvas-bio" style="display: none;"></canvas>
+
+<script>
+    const bioModal = document.getElementById('bio-modal');
+    const videoBio = document.getElementById('video-bio');
+    const canvasBio = document.getElementById('canvas-bio');
+    const verifyBtn = document.getElementById('verify-face-btn');
+    const payBtn = document.getElementById('pay-btn');
+    const stepFace = document.getElementById('step-face');
+    const stepPin = document.getElementById('step-pin');
+    const stepSuccess = document.getElementById('step-success');
+
+    let capturedFaceData = null;
+
+    function revealScratchCard() {
+        const cover = document.getElementById('scratch-cover');
+        const card = document.getElementById('scratch-card');
+        
+        if (cover.style.opacity !== '0') {
+            card.style.transform = 'scale(0.95)';
+            setTimeout(() => card.style.transform = 'scale(1)', 150);
+            
+            // Give a random reward between ₹10 and ₹150
+            const reward = Math.floor(Math.random() * 140) + 10; 
+            document.getElementById('reward-amount').innerText = `₹${reward}`;
+            cover.style.transform = 'rotateY(90deg) scale(0.9)';
+            cover.style.opacity = '0';
+            setTimeout(() => { cover.style.display = 'none'; }, 600);
+        }
+    }
+
+    function openTransferModal() {
+        if (!document.getElementById('recipient_upi').value || !document.getElementById('amount').value) {
+            showToast("Please fill in all details", "error");
+            return;
+        }
+
+        // Reset steps
+        stepFace.style.display = 'block';
+        stepPin.style.display = 'none';
+        stepSuccess.style.display = 'none';
+        capturedFaceData = null;
+        verifyBtn.innerHTML = "Scan & Verify";
+        verifyBtn.disabled = false;
+
+        bioModal.style.display = 'flex';
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                videoBio.srcObject = stream;
+            })
+            .catch(err => {
+                showToast("Camera access required for verification", "error");
+                closeModal();
+            });
+    }
+
+    function closeModal() {
+        bioModal.style.display = 'none';
+        if (videoBio.srcObject) {
+            videoBio.srcObject.getTracks().forEach(track => track.stop());
+        }
+        document.getElementById('confirm_pin').value = '';
+    }
+
+    async function verifyFaceOnly() {
+        verifyBtn.innerHTML = '<span class="spinner"></span> Verifying...';
+        verifyBtn.disabled = true;
+
+        const context = canvasBio.getContext('2d');
+        canvasBio.width = videoBio.videoWidth;
+        canvasBio.height = videoBio.videoHeight;
+        context.drawImage(videoBio, 0, 0, canvasBio.width, canvasBio.height);
+
+        capturedFaceData = canvasBio.toDataURL('image/jpeg');
+
+        const formData = new FormData();
+        formData.append('face_image', capturedFaceData);
+
+        try {
+            const resp = await fetch('/verify_face_only', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await resp.json();
+
+            if (result.status === 'success') {
+                showToast(result.message);
+                // Transition to PIN step
+                stepFace.style.display = 'none';
+                stepPin.style.display = 'block';
+                // Stop camera to save resources
+                if (videoBio.srcObject) {
+                    videoBio.srcObject.getTracks().forEach(track => track.stop());
+                }
+            } else {
+                showToast(result.message, "error");
+                verifyBtn.innerHTML = "Scan & Verify";
+                verifyBtn.disabled = false;
+            }
+        } catch (err) {
+            showToast("Face verification failed", "error");
+            verifyBtn.innerHTML = "Scan & Verify";
+            verifyBtn.disabled = false;
+        }
+    }
+
+    async function completeTransaction() {
+        const pin = document.getElementById('confirm_pin').value;
+        if (!pin) {
+            showToast("Please enter your PIN", "error");
+            return;
+        }
+
+        payBtn.innerHTML = '<span class="spinner"></span> Authorizing...';
+        payBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('recipient_upi', document.getElementById('recipient_upi').value);
+        formData.append('amount', document.getElementById('amount').value);
+        formData.append('face_image', capturedFaceData);
+        formData.append('pin', pin);
+
+        try {
+            const resp = await fetch('/transfer', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await resp.json();
+
+            if (result.status === 'success') {
+                stepPin.style.display = 'none';
+                stepSuccess.style.display = 'block';
+                const amount = document.getElementById('amount').value;
+                const recipient = document.getElementById('recipient_upi').value;
+                document.getElementById('success-message').innerHTML = `Successfully transferred <b>₹${amount}</b> to <b>${recipient}</b>.`;
+
+                // Simulate SMS popup notification for bank debit
+                setTimeout(() => {
+                    const cardLast4 = "{{ user.bank_card_last4 }}";
+                    showToast(`
+                        <div style="display: flex; align-items: start; text-align: left; gap: 12px; margin-bottom: -5px;">
+                            <div style="background: white; border-radius: 8px; padding: 4px; display: inline-flex;">
+                                <span style="font-size: 24px;">🏦</span>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0 0 4px 0; font-size: 15px; color: #fff;">Bank Transaction Alert</h4>
+                                <p style="margin: 0; font-size: 13px; opacity: 0.9; line-height: 1.4;">
+                                    Debited <b>₹${amount}</b> from A/c ending in **${cardLast4}.
+                                </p>
+                            </div>
+                        </div>
+                    `, "error");
+                }, 1200);
+            } else {
+                showToast(result.message, "error");
+                payBtn.innerHTML = "Authorize Payment";
+                payBtn.disabled = false;
+            }
+        } catch (err) {
+            showToast("Transaction failed", "error");
+            payBtn.disabled = false;
+            payBtn.innerHTML = "Authorize Payment";
+        }
+    }
+</script>
+
+
+{% endblock %}
